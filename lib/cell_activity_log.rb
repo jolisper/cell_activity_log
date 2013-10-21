@@ -177,9 +177,10 @@ module CellActivityLog
       
       def make_call
         begin_call
-        @return = with_exception_log { method.bind(instance).(*arguments, &block) }
+        response = with_exception_log { method.bind(instance).(*arguments, &block) }
         end_call
-        @return
+        
+        response.tap { |obj| raise obj if obj.kind_of? Exception }
       end
 
       def set_begin_time!
@@ -199,9 +200,12 @@ module CellActivityLog
       end
 
       def with_exception_log &block
-        block.call
-      rescue Exception => exception
-        flusher.async.exception(instance.class, method.name, begin_time, build_message, call_hash, exception)
+        begin
+          block.call
+        rescue Exception => exception
+          flusher.async.exception(instance.class, method.name, begin_time, build_message, call_hash, exception)
+          exception
+        end
       end
 
       def build_message
